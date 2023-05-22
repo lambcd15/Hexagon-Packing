@@ -181,75 +181,88 @@ def extract_and_measure_edges(img_bin,cnt,corner_params):
 
     # # Get the angles for each of the corners
     angles = []
-    for i in range(len(re_ordered_corners)):
-        if i == 4:
-            angles.append(round((180 - getAngle(re_ordered_corners[i],re_ordered_corners[i+1],re_ordered_corners[0])),3))
-        elif i == 5:
-            angles.append(round((180 - getAngle(re_ordered_corners[i],re_ordered_corners[0],re_ordered_corners[1])),3))
-        else:
-            angles.append(round((180 - getAngle(re_ordered_corners[i],re_ordered_corners[i+1],re_ordered_corners[i+2])),3))
-        text = str('{:d} '.format(i) + str(angles[i]))
-        x = re_ordered_corners[i][0] + 10
-        y = re_ordered_corners[i][1] + 20
+    # modify the corners array to allow for the angles to be determined correctly
+    modify_corners = re_ordered_corners.copy()
+    length = len(re_ordered_corners)
+    modify_corners.insert(0, re_ordered_corners[len(re_ordered_corners) - 1])
+    modify_corners.append(re_ordered_corners[0])
+    sum_angle = 0
+    for i in range(0,length):
+        angles.append(round((getAngle(modify_corners[i],modify_corners[i+1],modify_corners[i+2])),8))
+        text = str('{:d} '.format(i) + str(round(180 - angles[i],3)))
+        x = re_ordered_corners[i][0]
+        y = re_ordered_corners[i][1] + 25
         cv2.putText(output, text, (x,y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 1)
-    # print(angles, round(sum(angles)))
+        sum_angle = sum_angle + (180 - angles[i])
+    print(angles, round(sum_angle,3))
     return output, rot_angle, angles, lengths
 
 def straighten_image(img):
     # angle_num = 0
     # image_num = 0
-    angle_num = 0#random.randint(0, 360)# add a random angle to each image to be removed by this system
-    corner_params = [70,23,0.0415]
-    color = [0, 0, 0]
-    top, bottom, left, right = [150]*4
-    thr = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
-    print("angle: ",angle_num)
-    rot = rotate_image(thr,angle_num) ##*****************************************************
-    thr = rot
-    contours = cv2.findContours(thr, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    # print(contours)
-    contours = contours[0] if len(contours) == 2 else contours[1]
-    cnt = max(contours, key=cv2.contourArea)
-    thr = cv2.drawContours(np.zeros_like(thr), [cnt], -1, 255, 1)
-
-    # Extract and measure edges, and visualize output
-    out, rot_angle, corner_angles, side_lengths = extract_and_measure_edges(thr,cnt,corner_params)
-    # Rotate the image if there if the first two corners are out of alignment to make all the shapes have a horizontal top
-    while abs(rot_angle) > 0.2: 
-        rot = rotate_image(thr,rot_angle)
+    for z in range(0,360):
+        angle_num = z#random.randint(0, 360)# add a random angle to each image to be removed by this system
+        corner_params = [70,23,0.0415]
+        color = [0, 0, 0]
+        top, bottom, left, right = [150]*4
+        thr = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)
+        # print("angle: ",angle_num)
+        rot = rotate_image(thr,angle_num) ##*****************************************************
         thr = rot
         contours = cv2.findContours(thr, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
         # print(contours)
         contours = contours[0] if len(contours) == 2 else contours[1]
         cnt = max(contours, key=cv2.contourArea)
         thr = cv2.drawContours(np.zeros_like(thr), [cnt], -1, 255, 1)
+
+        # Extract and measure edges, and visualize output
         out, rot_angle, corner_angles, side_lengths = extract_and_measure_edges(thr,cnt,corner_params)
+        # Rotate the image if there if the first two corners are out of alignment to make all the shapes have a horizontal top
+        while abs(rot_angle) > 0.2: 
+            rot = rotate_image(thr,rot_angle)
+            thr = rot
+            contours = cv2.findContours(thr, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            # print(contours)
+            contours = contours[0] if len(contours) == 2 else contours[1]
+            cnt = max(contours, key=cv2.contourArea)
+            thr = cv2.drawContours(np.zeros_like(thr), [cnt], -1, 255, 1)
+            out, rot_angle, corner_angles, side_lengths = extract_and_measure_edges(thr,cnt,corner_params)
 
-    # cv2.imshow("output",out)
-    # cv2.waitKey()
+        cv2.imshow("output",out)
+        cv2.waitKey(1)
 
-    plt.figure(figsize=(18, 6))
-    plt.subplot(1, 3, 1), plt.imshow(rot), plt.title('Original input image')
-    plt.subplot(1, 3, 2), plt.imshow(thr, cmap='gray'), plt.title('Contour needed')
-    plt.subplot(1, 3, 3), plt.imshow(out), plt.title('Results')
-    plt.tight_layout(), plt.show()
+    # plt.figure(figsize=(18, 6))
+    # plt.subplot(1, 3, 1), plt.imshow(rot), plt.title('Original input image')
+    # plt.subplot(1, 3, 2), plt.imshow(thr, cmap='gray'), plt.title('Contour needed')
+    # plt.subplot(1, 3, 3), plt.imshow(out), plt.title('Results')
+    # plt.tight_layout(), plt.show()
     # Return the aligned image, output image and the angle and length parameters
     return thr, out, corner_angles, side_lengths
 
+# Primary parameter arrays
 processed_images = []
 graphics_images = []
 corner_angle_Array = []
 side_length_Array = []
 
 
-for i in range(len(img_raw)):
+for i in range(7,len(img_raw)):
+    print(i)
     processed, graphic, corner_angle, side_length = straighten_image(img_raw[i])
     processed_images.append(processed)
     graphics_images.append(graphic)
     corner_angle_Array.append(corner_angle)
     side_length_Array.append(side_length)
 
-
+num = 0
+img = processed_images[num]
+rot_old = img
+for i in range(0,6):
+    # Quick test loop for the angles
+    rot = rotate_image(rot_old,corner_angle_Array[num][i])
+    print(corner_angle_Array[num][i])
+    show_image("angle: ",rot)
+    rot_old = rot
 
 
 
